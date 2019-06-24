@@ -439,15 +439,35 @@ function ConvexHull.Proto:SetColor(r, g, b, a)
     end
 end
 
+--- Add a button into the center of the hull
+-- @param   button      <frame>     frame
+function ConvexHull.Proto:AddButton(button)
+    -- Hide old button if there is one
+    if self.Button then 
+        self.Button:ClearAllPoints()
+        self.Button:Hide() 
+    end
+    self.button = button
+    -- Only go on if there is a new button
+    if not button then return end
 
+    button:ClearAllPoints()
+    button:SetParent(self.frame)
+    button:SetPoint("CENTER", self.frame, "CENTER")
+end
+
+--- Remove the set button
+function ConvexHull.Proto:RemoveButton()
+    self:AddButton(nil)
+end
 -- ########################
 -- Test
 -- ########################
 --TestB:Draw(WorldMapFrame.ScrollContainer)
-TestB = ConvexHull:New(testTable)
-TestB:Draw(WorldMapFrame.ScrollContainer)
-TestB:DrawBorder()
-TestB:SetColor(1, 0, 0)
+--TestB = ConvexHull:New(testTable)
+--TestB:Draw(WorldMapFrame.ScrollContainer)
+--TestB:DrawBorder()
+--TestB:SetColor(1, 0, 0)
 
 --TestC = ConvexHull:New(testTab2)
 --TestC:Draw(WorldMapFrame.ScrollContainer)
