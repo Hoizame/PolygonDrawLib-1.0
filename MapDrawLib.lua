@@ -460,16 +460,25 @@ end
 function ConvexHull.Proto:RemoveButton()
     self:AddButton(nil)
 end
+
+--- This destroys the hull
+-- set all frames free and remove all functions from the hull but keeps the data
+function ConvexHull.Proto:Destroy()
+    ConvexHull_FreeFrame(self.frame)
+    self.frame = nil
+    setmetatable(self, nil)
+end
+
 -- ########################
 -- Test
 -- ########################
 --TestB:Draw(WorldMapFrame.ScrollContainer)
---TestB = ConvexHull:New(testTable)
---TestB:Draw(WorldMapFrame.ScrollContainer)
---TestB:DrawBorder()
---TestB:SetColor(1, 0, 0)
+TestB = ConvexHull:New(testTable)
+TestB:Draw(WorldMapFrame.ScrollContainer)
+TestB:DrawBorder()
+TestB:SetColor(1, 0, 0)
 
---TestC = ConvexHull:New(testTab2)
---TestC:Draw(WorldMapFrame.ScrollContainer)
---TestC:DrawBorder()
---TestC:SetColor(1, 0, 0)
+TestC = ConvexHull:New(testTab2)
+TestC:Draw(WorldMapFrame.ScrollContainer)
+TestC:DrawBorder()
+TestC:SetColor(1, 0, 0)
