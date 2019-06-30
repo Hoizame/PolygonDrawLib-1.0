@@ -33,10 +33,11 @@ local DEFAULT_COLORS = {
 local ConvexHullContainer = {}
 local ConvexHullFrameContainer = {}
 
-ConvexHull = {
+local ConvexHull = {
 	Proto = {}
 }
-ConvexHull.mt = { __index = ConvexHull.Proto }
+local ConvexHull_mt = { __index = ConvexHull.Proto }
+MDL.ConvexHull = ConvexHull
 
 local function ConvexHull_FreeContainer(frame)
     for i = 1, #frame.container do
@@ -311,7 +312,7 @@ function ConvexHull:New(tab, isXYtable)
         xEntry = x,
         yEntry = y,
 	}
-	setmetatable(convexHull, ConvexHull.mt)
+	setmetatable(convexHull, ConvexHull_mt)
 	ConvexHullContainer[tab] = convexHull
 	
 	return convexHull
