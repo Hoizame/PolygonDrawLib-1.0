@@ -22,6 +22,10 @@ local print = print
 local IS_TEST = true
 local TRIANGLE_PATH = LibPath.."/Utils/triangle.tga"
 local LINE_PATH = LibPath.."/Utils/line.blp"
+local DEFAULT_COLORS = {
+    hull    =    {1, 1, 1, 0.5},
+    border  =    {1, 1, 1, 0.6},
+}
 
 -- ########################
 -- local
@@ -119,11 +123,12 @@ local function ConvexHull_GetFrame(ty, parent)
 	return frame
 end
 
-local function InitDefaultColor(colorTable, rDefault, gDefault, bDefault, aDefault, r, g, b, a)
-    colorTable[1] = r or colorTable[1] or rDefault
-    colorTable[2] = g or colorTable[2] or gDefault
-    colorTable[3] = b or colorTable[3] or bDefault
-    colorTable[4] = a or colorTable[4] or aDefault
+local function InitDefaultColor(colorTable, default, r, g, b, a)
+    default = DEFAULT_COLORS[default]
+    colorTable[1] = r or colorTable[1] or default[1]
+    colorTable[2] = g or colorTable[2] or default[2]
+    colorTable[3] = b or colorTable[3] or default[3]
+    colorTable[4] = a or colorTable[4] or default[4]
 end
 
 -- Some parts here are from the AVR addon
@@ -398,7 +403,7 @@ end
 function ConvexHull.Proto:SetBorderColor(r, g, b, a)
     if not self.borderColor then self.borderColor = {} end
 
-    InitDefaultColor(self.borderColor, 1, 1, 1, 0.6, r, g, b, a)
+    InitDefaultColor(self.borderColor, "border", r, g, b, a)
 
     -- check if we must update color
     if self.borderThickness and self.frame and #self.frame.container > 0 then
@@ -418,7 +423,7 @@ end
 function ConvexHull.Proto:SetColor(r, g, b, a)
     if not self.hullColor then self.hullColor = {} end
 
-    InitDefaultColor(self.hullColor, 1, 1, 1, 0.5, r, g, b, a)
+    InitDefaultColor(self.hullColor, "hull", r, g, b, a)
 
     -- check if we must update color
     if self.frame and #self.frame.container > 0 then
@@ -459,6 +464,15 @@ function ConvexHull.Proto:Destroy()
     ConvexHull_FreeFrame(self.frame)
     self.frame = nil
     setmetatable(self, nil)
+end
+
+--- Change the alpha values of the drawings
+-- nil reset the alpha to default
+-- @param   hullAlpha         <number>    0 - 1
+-- @param   borderAlpha       <number>    0 - 1
+function ConvexHull.Proto:SetAlpha(hullAlpha, borderAlpha)
+    self:SetColor(nil, nil, nil, hullAlpha or DEFAULT_COLORS["hull"][4])
+    self:SetBorderColor(nil, nil, nil, borderAlpha or DEFAULT_COLORS["border"][4])
 end
 
 -- ########################
