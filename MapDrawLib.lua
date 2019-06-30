@@ -19,53 +19,105 @@ local CreateFrame = CreateFrame
 local print = print
 
 -- locales
+local IS_TEST = true
+local TRIANGLE_PATH = LibPath.."/Utils/triangle.tga"
+local LINE_PATH = LibPath.."/Utils/line.blp"
 
 -- ########################
 -- local
 -- ########################
-local testTable = {
-    {46.40,36.00},
-    {46.90,35.80},
-    {48.89,36.44},
-    {49.55,36.06},
-    {49.15,36.93},
-    {48.1,36.96},
-    {48.37,36.74},
-    {49.32,35.81},
-    {48.87,35.14},
-    {49.87,36.3},
-    {48.52,36.13},
-    {49.17,36.55},
-    {46.93,35.67},
-    {47.58,35.94},
-    {47.65,36.91},
-    {47.86,36.26},
-    {47.57,36.37},
-    {47.62,35.75},
-    {47.91,35.49},
-    {47.36,36.31},
-    {47.22,36.0},
-    {47.55,34.98},
-    {49.79,35.17},
-    {49.44,35.34},
-    {49.73,35.8},
-    {50.04,35.46},
-    {51.3,36.5},
-    {51.23,36.02},
-    {51.61,35.68},
-    {50.49,37.61},
-    {50.98,37.58},
-    {51.29,37.43},
-    {50.76,37.47},
-    {51.36,37.02},
-    {51.68,37.01},
-}
-local testTab2 = {
-    {45.91,40.31},{49.16,45.38},{46.66,39.39},{49.41,37.75},{48.17,37.37},{48.15,34.91},{45.96,36.37},{46.6,35.13},{46.15,35.53},{46.25,36.73},{48.51,33.67},{46.34,34.42},{45.2,35.15},{45.69,34.96},{46.96,34.46},{50.93,35.71},{52.74,35.14},{50.16,37.41},{51.24,40.45},{52.51,39.15},{52.65,38.37},{52.63,40.48},{53.07,38.74},{51.88,41.56},{52.53,42.19},{51.53,43.7},{50.92,44.14},{50.89,44.37},{51.71,43.13},{51.61,42.38},{49.9,46.59},{49.48,49.26},{49.35,47.46},{48.98,47.04},{51.45,45.58},{50.38,44.94},
-}
-local TestFrame = CreateFrame("Frame", WorldMapFrame.ScrollContainer)
-TestFrame:SetAllPoints(WorldMapFrame.ScrollContainer)
+local ConvexHullContainer = {}
+local ConvexHullFrameContainer = {}
 
+ConvexHull = {
+	Proto = {}
+}
+ConvexHull.mt = { __index = ConvexHull.Proto }
+
+local function ConvexHull_FreeContainer(frame)
+    for i = 1, #frame.container do
+        frame.unusedContainer[frame.container[i].ty][frame.container[i]] = true
+    end
+    wipe(frame.container)
+end
+
+local function ConvexHull_FreeFrame(frame)
+	if frame.ty == "main" then
+        ConvexHull_FreeContainer(frame)
+        ConvexHullFrameContainer[frame] = true
+
+        frame.borderThickness = nil
+        frame.frame = nil
+        frame.borderColor = nil
+        frame.borderDrawn = nil
+        frame.hullColor = nil
+        frame:ClearAllPoints()
+        frame:Hide()
+    end
+end
+
+local function ConvexHull_FreeFrameType(mainFrame, typ)
+    if mainFrame.ty ~= "main" then return end
+    local saver = mainFrame.container
+    mainFrame.container = {}
+    local counter = 0
+    for i = 1, #saver do
+        if saver[i].ty == typ then
+            mainFrame.unusedContainer[saver[i].ty][saver[i]] = true
+            saver[i]:Hide()
+            counter = counter + 1
+        else
+            mainFrame.container[#mainFrame.container+1] = saver[i]
+        end
+    end
+    --print(counter.." of type "..typ.." are freed")
+end
+
+local function ConvexHull_GetFrame(ty, parent)
+    if not ty then return end
+	local frame = next(ty == "main" and ConvexHullFrameContainer or parent.unusedContainer[ty])
+    if not frame then
+		if ty == "triangle" and parent then
+			frame = parent:CreateTexture(nil, "TOOLTIP")
+			frame:SetTexture(TRIANGLE_PATH, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+            --frame:SetVertexColor(0,0,1,0.5)
+        elseif ty == "line" and parent then
+            frame = parent:CreateLine(nil, "TOOLTIP")
+            frame:SetTexture(LINE_PATH)
+            frame:SetBlendMode("ADD")
+            --frame:SetVertexColor(0,0,1,0.8)
+            --frame:SetAtlas('_UI-Taxi-Line-horizontal')
+            --frame:SetAlpha(0.5)
+		elseif ty == "main" and parent then
+			frame = CreateFrame("Frame")
+
+			frame.unusedContainer = {
+                ["triangle"] = {},
+                ["line"] = {},
+            }
+			frame.container = {}
+		elseif (ty == "triangle" or ty == "main" or ty == "line") and not parent then
+			error(ty.." no parent found ConvexHull_GetFrame")
+		else
+			error(ty.." not found for ConvexHull_GetFrame")
+		end
+        frame.ty = ty
+        frame:Hide()
+	elseif ty == "main" then
+        ConvexHullFrameContainer[frame] = nil
+	elseif ty == "triangle" or ty == "line" then
+        parent.unusedContainer[ty][frame] = nil
+	end
+	
+	if ty == "triangle" or ty == "line" then
+		parent.container[#parent.container+1] = frame
+    end
+    if ty ~= "line" then
+        frame:ClearAllPoints()
+        frame:SetParent(parent)
+    end
+	return frame
+end
 
 local function InitDefaultColor(colorTable, rDefault, gDefault, bDefault, aDefault, r, g, b, a)
     colorTable[1] = r or colorTable[1] or rDefault
@@ -136,90 +188,31 @@ local function DrawTriangle(parent,tri,x1,y1,x2,y2,x3,y3)
     tri:SetPoint("TOPRIGHT",parent,"BOTTOMLEFT",maxx,maxy)
 end
 
-local ConvexHullContainer = {}
-local ConvexHullFrameContainer = {}
--- TODO: The Path :S
-local TRIANGLE_PATH = LibPath.."/Utils/triangle.tga"
-local LINE_PATH = LibPath.."/Utils/line.blp"
-
-ConvexHull = {
-	Proto = {}
-}
-ConvexHull.mt = { __index = ConvexHull.Proto }
-
-local function ConvexHull_FreeContainer(frame)
-    for i = 1, #frame.container do
-        frame.unusedContainer[frame.container[i].ty][frame.container[i]] = true
-    end
-    wipe(frame.container)
-end
-
-local function ConvexHull_FreeFrame(frame)
-	if frame.ty == "main" then
-        ConvexHull_FreeContainer(frame)
-        ConvexHullFrameContainer[frame] = true
-
-        frame.borderThickness = nil
-        frame.frame = nil
-        frame.borderColor = nil
-        frame.hullColor = nil
-        frame:ClearAllPoints()
-        frame:Hide()
-    end
-end
-
-local function ConvexHull_GetFrame(ty, parent)
-    if not ty then return end
-	local frame = next(ty == "main" and ConvexHullFrameContainer or parent.unusedContainer[ty])
-	if not frame then
-		if ty == "triangle" and parent then
-			frame = parent:CreateTexture(nil, "TOOLTIP")
-			frame:SetTexture(TRIANGLE_PATH, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-            --frame:SetVertexColor(0,0,1,0.5)
-        elseif ty == "line" and parent then
-            frame = parent:CreateLine(nil, "TOOLTIP")
-            frame:SetTexture(LINE_PATH)
-            frame:SetBlendMode("ADD")
-            --frame:SetVertexColor(0,0,1,0.8)
-            --frame:SetAtlas('_UI-Taxi-Line-horizontal')
-            --frame:SetAlpha(0.5)
-		elseif ty == "main" and parent then
-			frame = CreateFrame("Frame")
-
-			frame.unusedContainer = {
-                ["triangle"] = {},
-                ["line"] = {},
-            }
-			frame.container = {}
-		elseif (ty == "triangle" or ty == "main" or ty == "line") and not parent then
-			error(ty.." no parent found ConvexHull_GetFrame")
-		else
-			error(ty.." not found for ConvexHull_GetFrame")
-		end
-        frame.ty = ty
-        frame:Hide()
-	elseif ty == "main" then
-		ConvexHullFrameContainer[frame] = nil
-	elseif ty == "triangle" or ty == "line" then
-        parent.unusedContainer[ty][frame] = nil
-	end
-	
-	if ty == "triangle" or ty == "line" then
-		parent.container[#parent.container+1] = frame
-    end
-    if ty ~= "line" then
-        frame:ClearAllPoints()
-        frame:SetParent(parent)
-    end
-	return frame
-end
-
 local function IsCounterClockWise(curPoint, checkPoint, nextPoint, isXYtable) 
 	local x,y = 1,2
 	if isXYtable then
 		x,y = "x","y"
 	end
 	return ((checkPoint[y] - curPoint[y]) * (nextPoint[x] - checkPoint[x]) - (checkPoint[x] - curPoint[x]) * (nextPoint[y] - checkPoint[y])) < 0 
+end
+
+local function CreateMainFrame(self, parent, freeFrames)
+    local x,y = self.xEntry, self.yEntry
+
+    assert(parent, "parent not found.")
+    -- this frees the frame and let us redraw
+    if self.frame and freeFrames then
+        ConvexHull_FreeFrame(self.frame)
+    end
+
+    local startPointX, startPointY = self.centroidAbsolute[x], self.centroidAbsolute[y]
+	local frame = ConvexHull_GetFrame("main", parent)
+	frame:SetPoint("CENTER", parent, "TOPLEFT", startPointX*(parent:GetWidth()/100), -(startPointY*(parent:GetHeight()/100)))
+    frame:SetSize(self.boxSize[1]*(parent:GetWidth()/100), self.boxSize[2]*(parent:GetHeight()/100))
+    frame:Show()
+
+    self.frame = frame
+    return frame
 end
 
 -- ########################
@@ -320,14 +313,25 @@ function ConvexHull:New(tab, isXYtable)
 end
 
 --- Adds a border around the hull
--- this only works if the hull is already drawn, if not it draws it with the call of :Draw
+-- draws a border around the hull, this needs a parent frame if the hull is not drawn jet with :Draw
 -- @param   thickness     <number>    thickness of the border     default: 15
-function ConvexHull.Proto:DrawBorder(thickness)
+-- @param   parent        <frame>     Frame where the hull should be drawn
+function ConvexHull.Proto:DrawBorder(thickness, parent)
     thickness = thickness or 15
+    if self.borderDrawn and thickness == self.borderThickness then
+        return
+    elseif self.frame then
+        ConvexHull_FreeFrameType(self.frame, "line")
+    end
     self.borderThickness = thickness
 
-    -- only draw if the hull is created and shown
-    if not self.frame then return end
+    -- Create the main frame if not exist.
+    if not self.frame and parent then 
+        CreateMainFrame(self, parent, true)
+    elseif not self.frame then
+        return 
+    end
+
     local x,y = self.xEntry, self.yEntry
     local frame = self.frame
 
@@ -351,6 +355,7 @@ function ConvexHull.Proto:DrawBorder(thickness)
     end
     --init colors
     self:SetBorderColor()
+    self.borderDrawn = true
 end
 
 --- Draws the hull
@@ -361,21 +366,8 @@ function ConvexHull.Proto:Draw(parent, border, borderThickness)
 	-- check format
     local x,y = self.xEntry, self.yEntry
     
-    -- this frees the frame and let us redraw
-    if self.frame then
-        ConvexHull_FreeFrame(self.frame)
-    end
-	
-	-- the center is start
-    local startPointX, startPointY = self.centroidAbsolute[x], self.centroidAbsolute[y]
-	--ConvexHull_GetFrame("main", UIParent)
-	local frame = ConvexHull_GetFrame("main", parent)
-	frame:SetPoint("CENTER", parent, "TOPLEFT", startPointX*(parent:GetWidth()/100), -(startPointY*(parent:GetHeight()/100)))
-    frame:SetSize(self.boxSize[1]*(parent:GetWidth()/100), self.boxSize[2]*(parent:GetHeight()/100))
-    --frame:SetAllPoints(parent)
-    frame:Show()
-    --print("SetSize", self.boxSize[1], self.boxSize[2], startPointX, startPointY)
-    self.frame = frame
+    
+    local frame = CreateMainFrame(self, parent, true)
 
 	-- get triangle points
     local lastPoint
@@ -472,10 +464,53 @@ end
 -- ########################
 -- Test
 -- ########################
+
+if not IS_TEST then return end
+local testTable = {
+    {46.40,36.00},
+    {46.90,35.80},
+    {48.89,36.44},
+    {49.55,36.06},
+    {49.15,36.93},
+    {48.1,36.96},
+    {48.37,36.74},
+    {49.32,35.81},
+    {48.87,35.14},
+    {49.87,36.3},
+    {48.52,36.13},
+    {49.17,36.55},
+    {46.93,35.67},
+    {47.58,35.94},
+    {47.65,36.91},
+    {47.86,36.26},
+    {47.57,36.37},
+    {47.62,35.75},
+    {47.91,35.49},
+    {47.36,36.31},
+    {47.22,36.0},
+    {47.55,34.98},
+    {49.79,35.17},
+    {49.44,35.34},
+    {49.73,35.8},
+    {50.04,35.46},
+    {51.3,36.5},
+    {51.23,36.02},
+    {51.61,35.68},
+    {50.49,37.61},
+    {50.98,37.58},
+    {51.29,37.43},
+    {50.76,37.47},
+    {51.36,37.02},
+    {51.68,37.01},
+}
+local testTab2 = {
+    {45.91,40.31},{49.16,45.38},{46.66,39.39},{49.41,37.75},{48.17,37.37},{48.15,34.91},{45.96,36.37},{46.6,35.13},{46.15,35.53},{46.25,36.73},{48.51,33.67},{46.34,34.42},{45.2,35.15},{45.69,34.96},{46.96,34.46},{50.93,35.71},{52.74,35.14},{50.16,37.41},{51.24,40.45},{52.51,39.15},{52.65,38.37},{52.63,40.48},{53.07,38.74},{51.88,41.56},{52.53,42.19},{51.53,43.7},{50.92,44.14},{50.89,44.37},{51.71,43.13},{51.61,42.38},{49.9,46.59},{49.48,49.26},{49.35,47.46},{48.98,47.04},{51.45,45.58},{50.38,44.94},
+}
+
 --TestB:Draw(WorldMapFrame.ScrollContainer)
 TestB = ConvexHull:New(testTable)
-TestB:Draw(WorldMapFrame.ScrollContainer)
-TestB:DrawBorder()
+--TestB:Draw(WorldMapFrame.ScrollContainer)
+TestB:DrawBorder(nil, WorldMapFrame.ScrollContainer)
 TestB:SetColor(1, 0, 0)
 
 TestC = ConvexHull:New(testTab2)
