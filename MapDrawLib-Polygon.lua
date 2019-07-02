@@ -9,10 +9,11 @@ local MDL_P, oldversion = LibStub:NewLibrary(MAJOR, MINOR)
 if not MDL_P then return end
 
 -- upvalue lua api
-local wipe = table.wipe
-local setmetatable, next = setmetatable, next
+local wipe, next = table.wipe, next
+local setmetatable = setmetatable
 local type = type
 local min, max, random = math.min, math.max, math.random
+local assert, error = assert, error
 
 -- upvalue wow api
 local CreateFrame = CreateFrame
@@ -26,6 +27,9 @@ local DEFAULT_COLORS = {
     polygon    =    {1, 1, 1, 0.5},
     border      =    {1, 1, 1, 0.6},
 }
+-- 512 = triagle size
+local CALC_A = 510/512
+local CALC_B = 1/512
 
 -- ########################
 -- local
@@ -105,7 +109,7 @@ local function Frame_GetFrame(ty, parent)
 	elseif ty == "triangle" or ty == "line" then
         parent.unusedContainer[ty][frame] = nil
 	end
-	
+
 	if ty == "triangle" or ty == "line" then
 		parent.container[#parent.container+1] = frame
     end
@@ -139,7 +143,7 @@ local function DrawTriangle(parent,tri,x1,y1,x2,y2,x3,y3)
     local miny=min(y1,y2,y3)
     local maxx=max(x1,x2,x3)
     local maxy=max(y1,y2,y3)
-    
+
     if maxx<-frameWidth then return
     elseif minx>frameWidth then return
     elseif maxy<-frameHeight then return
@@ -149,7 +153,7 @@ local function DrawTriangle(parent,tri,x1,y1,x2,y2,x3,y3)
     local dx=maxx-minx
     local dy=maxy-miny
     if dx==0 or dy==0 then return end
-    
+
     local tx3,ty1,ty2,ty3
     if x1==minx then
         if x2==maxx then
@@ -159,22 +163,22 @@ local function DrawTriangle(parent,tri,x1,y1,x2,y2,x3,y3)
         end
     elseif x2==minx then
         if x1==maxx then
-            tx3,ty1,ty2,ty3=(x3-minx)/dx,(maxy-y2),(maxy-y1),(maxy-y3) 
+            tx3,ty1,ty2,ty3=(x3-minx)/dx,(maxy-y2),(maxy-y1),(maxy-y3)
         else
-            tx3,ty1,ty2,ty3=(x1-minx)/dx,(maxy-y2),(maxy-y3),(maxy-y1) 
+            tx3,ty1,ty2,ty3=(x1-minx)/dx,(maxy-y2),(maxy-y3),(maxy-y1)
         end
     else -- x3==minx
         if x2==maxx then
-            tx3,ty1,ty2,ty3=(x1-minx)/dx,(maxy-y3),(maxy-y2),(maxy-y1) 
+            tx3,ty1,ty2,ty3=(x1-minx)/dx,(maxy-y3),(maxy-y2),(maxy-y1)
         else
-            tx3,ty1,ty2,ty3=(x2-minx)/dx,(maxy-y3),(maxy-y1),(maxy-y2) 
+            tx3,ty1,ty2,ty3=(x2-minx)/dx,(maxy-y3),(maxy-y1),(maxy-y2)
         end
     end
-    
-    local t1=-0.99609375/(ty3-tx3*ty2+(tx3-1)*ty1) -- 0.99609375==510/512
+
+    local t1=-CALC_A/(ty3-tx3*ty2+(tx3-1)*ty1)
     local t2=dy*t1
-    x1=0.001953125-t1*tx3*ty1 -- 0.001953125=1/512
-    x2=0.001953125+t1*ty1
+    x1=CALC_B-t1*tx3*ty1
+    x2=CALC_B+t1*ty1
     x3=t2*tx3+x1
     y1=t1*(ty2-ty1)
     y2=t1*(ty1-ty3)
@@ -186,12 +190,11 @@ local function DrawTriangle(parent,tri,x1,y1,x2,y2,x3,y3)
     tri:SetPoint("TOPRIGHT",parent,"BOTTOMLEFT",maxx,maxy)
 end
 
-local function IsCounterClockWise(curPoint, checkPoint, nextPoint, isXYtable) 
-	local x,y = 1,2
-	if isXYtable then
-		x,y = "x","y"
-	end
-	return ((checkPoint[y] - curPoint[y]) * (nextPoint[x] - checkPoint[x]) - (checkPoint[x] - curPoint[x]) * (nextPoint[y] - checkPoint[y])) < 0 
+--line:SetStartPoint("TOPLEFT", frame, lastPoint[x]*calcX, -(lastPoint[y]*calcY))
+--line:SetEndPoint("TOPLEFT", frame, entry[x]*calcX, -(entry[y]*calcY))
+
+local function IsCounterClockWise(curPoint, checkPoint, nextPoint, x, y)
+	return ((checkPoint[y] - curPoint[y]) * (nextPoint[x] - checkPoint[x]) - (checkPoint[x] - curPoint[x]) * (nextPoint[y] - checkPoint[y])) < 0
 end
 
 local function CreateMainFrame(self, parent, freeFrames)
@@ -223,30 +226,30 @@ end
 -- @param	isXYtable	<bool>		true: { x=1, y=2 }		false: { 1, 2 }     default: false
 -- @param   notSilent   <bool>      show error on fail creating a polygon
 function MDL_P:New(tab, isXYtable, notSilent)
-    if not tab or type(tab) ~= "table" or #tab < 3 then 
+    if not tab or type(tab) ~= "table" or #tab < 3 then
         if notSilent then
             assert(tab, "'tab' is nil.")
             assert(type(tab) == "table", "'tab' must be a table.")
             assert(#tab >= 3, "'tab' must at least contain 3 entrys.")
         else
-            return 
+            return
         end
     end
-	
+
 	local x,y = 1,2
 	if isXYtable then
 		x,y = "x","y"
 	end
-	
+
 	-- Jarvis gift wrapping algorithm
 	-- find the left x point
 	local leftPointIndex = 1
-	for i = 1, #tab do 
+	for i = 1, #tab do
 		if tab[i][x] < tab[leftPointIndex][x] then
 			leftPointIndex = i
 		end
 	end
-	
+
 	local curPoint = leftPointIndex
 	local nextPoint
 	local hullTable = {}	-- format is same as given tab
@@ -255,35 +258,35 @@ function MDL_P:New(tab, isXYtable, notSilent)
 		-- get the next point
 		nextPoint = tab[curPoint + 1] and curPoint + 1 or 1
 		for i = 1, #tab do
-			if IsCounterClockWise(tab[curPoint], tab[i], tab[nextPoint], isXYtable) then 
-				nextPoint = i 
+			if IsCounterClockWise(tab[curPoint], tab[i], tab[nextPoint], x, y) then
+				nextPoint = i
 			end
 		end
-		
+
 		-- add the next point in the hull and go on with the next one
         hullTable[#hullTable+1] = tab[nextPoint]
 		curPoint = nextPoint
 	until(curPoint == leftPointIndex)	-- end when back at the startPoint
-	
+
 	-- get the centroid / boxSize
 	local centroid = { [x] = 0, [y] = 0 }
 	local centroidAbsolute = { [x] = 0, [y] = 0 }
 	local boxSize = { 0, 0 }
 	local helperCentroid = { left = tab[leftPointIndex], top = hullTable[1], right = hullTable[1], bottom = hullTable[1] }
 	local xTmp,yTmp
-	for i = 1, #hullTable do 
+	for i = 1, #hullTable do
 		xTmp,yTmp = hullTable[i][x], hullTable[i][y]
 		if yTmp > helperCentroid.top[y] then helperCentroid.top = hullTable[i] end
 		if xTmp > helperCentroid.right[x] then helperCentroid.right = hullTable[i] end
 		if yTmp < helperCentroid.bottom[y] then helperCentroid.bottom = hullTable[i] end
     end
 
-    
-	
+
+
 	-- get box boundings of the whole thing
-	boxSize[1] = helperCentroid.right[x] - helperCentroid.left[x] 
-	boxSize[2] = helperCentroid.top[y] - helperCentroid.bottom[y] 
-    
+	boxSize[1] = helperCentroid.right[x] - helperCentroid.left[x]
+	boxSize[2] = helperCentroid.top[y] - helperCentroid.bottom[y]
+
     if boxSize[1] == 0 or boxSize[2] == 0 then return end
 	-- we get the center of the box as that is needed for the drawing
 	centroid[x] = (boxSize[1]*0.5)*(100 / boxSize[1])
@@ -291,13 +294,14 @@ function MDL_P:New(tab, isXYtable, notSilent)
 	-- "TOPLEFT"
 	centroidAbsolute[x] = helperCentroid.left[x] + boxSize[1]*0.5
     centroidAbsolute[y] = helperCentroid.top[y] - boxSize[2]*0.5
-    
+
     -- inBoxPolygon
     local inBoxPolygon = {}
+    local calcBoxX, calcBoxY = 100 / boxSize[1], 100 / boxSize[2]
     for i = 1, #hullTable do
         inBoxPolygon[i] = {
-            [x] = (hullTable[i][x] - helperCentroid.left[x])*(100 / boxSize[1]),
-            [y] = (hullTable[i][y] - helperCentroid.bottom[y])*(100 / boxSize[2]),
+            [x] = (hullTable[i][x] - helperCentroid.left[x]) * calcBoxX,
+            [y] = (hullTable[i][y] - helperCentroid.bottom[y]) * calcBoxY,
         }
     end
 
@@ -312,7 +316,7 @@ function MDL_P:New(tab, isXYtable, notSilent)
         yEntry = y,
 	}
 	setmetatable(polygonRetTable, Proto_mt)
-	
+
 	return polygonRetTable
 end
 
@@ -334,10 +338,10 @@ function Proto:DrawBorder(thickness, parent)
     self.borderThickness = thickness
 
     -- Create the main frame if not exist.
-    if not self.frame and parent then 
+    if not self.frame and parent then
         CreateMainFrame(self, parent, true)
     elseif not self.frame then
-        return 
+        return
     end
 
     local x,y = self.xEntry, self.yEntry
@@ -346,7 +350,7 @@ function Proto:DrawBorder(thickness, parent)
     -- format the positions
     local calcX, calcY = frame:GetWidth() / 100, frame:GetHeight() / 100
 
-    -- draw the border 
+    -- draw the border
     local polygon = self.inBoxPolygon
     local lastPoint
     for i = 1, #polygon+1 do
@@ -355,8 +359,8 @@ function Proto:DrawBorder(thickness, parent)
 		if i > 1 then
             local line = Frame_GetFrame("line", frame)
             line:SetThickness(thickness)
-            line:SetStartPoint("BOTTOMLEFT", frame, lastPoint[x]*calcX, lastPoint[y]*calcY)
-            line:SetEndPoint("BOTTOMLEFT", frame, entry[x]*calcX, entry[y]*calcY)
+            line:SetStartPoint("TOPLEFT", frame, lastPoint[x]*calcX, -(lastPoint[y]*calcY))
+            line:SetEndPoint("TOPLEFT", frame, entry[x]*calcX, -(entry[y]*calcY))
             line:Show()
 		end
 		lastPoint = entry
@@ -377,13 +381,13 @@ end
 
 --- Draws the polygon
 -- @param   parent          <frame>     Frame where the polygon should be drawn
--- @param   border          <bool>      Draw border         default: false 
+-- @param   border          <bool>      Draw border         default: false
 -- @param   borderThickness <number>    See :DrawBorder     default: (:DrawBorder) => default
 function Proto:Draw(parent, border, borderThickness)
 	-- check format
     local x,y = self.xEntry, self.yEntry
-    
-    
+
+
     local frame = CreateMainFrame(self, parent, true)
 
 	-- get triangle points
@@ -400,10 +404,10 @@ function Proto:Draw(parent, border, borderThickness)
     end
     --init colors
     self:SetColor()
-    
+
     -- Draw border if needed
     if border or self.borderThickness then
-        self:DrawBorder(thickness or self.borderThickness)
+        self:DrawBorder(borderThickness or self.borderThickness)
     end
 end
 
@@ -459,9 +463,9 @@ end
 -- @param   button      <frame>     frame
 function Proto:AddButton(button)
     -- Hide old button if there is one
-    if self.Button then 
+    if self.Button then
         self.Button:ClearAllPoints()
-        self.Button:Hide() 
+        self.Button:Hide()
     end
     self.button = button
     -- Only go on if there is a new button
@@ -514,6 +518,7 @@ end
 
 if not IS_TEST then return end
 local testTab3 = {
+    --[[
     [3] = {'Flesh Eater',664,713,24,25,0,{[10]={{25.06,38.2},{25.37,36.04},{25.69,34.45},{23.81,39.21},{22.81,39.09},{22.04,32.62},{21.7,38.3},{22.2,36.96},{25.37,39.03},},},nil,10,nil,nil,},
     [6] = {'Kobold Vermin',42,55,1,2,0,{[12]={{48.89,36.44},{49.55,36.06},{49.15,36.93},{48.1,36.96},{48.37,36.74},{49.32,35.81},{48.87,35.14},{49.87,36.3},{48.52,36.13},{49.17,36.55},{46.93,35.67},{47.58,35.94},{47.65,36.91},{47.86,36.26},{47.57,36.37},{47.62,35.75},{47.91,35.49},{47.36,36.31},{47.22,36.0},{47.55,34.98},{49.79,35.17},{49.44,35.34},{49.73,35.8},{50.04,35.46},{51.3,36.5},{51.23,36.02},{51.61,35.68},{50.49,37.61},{50.98,37.58},{51.29,37.43},{50.76,37.47},{51.36,37.02},{51.68,37.01},},},nil,12,nil,nil,},
     [30] = {'Forest Spider',102,120,5,6,0,{[12]={{36.43,55.89},{31.43,57.03},{35.98,62.7},{38.47,62.4},{28.46,66.71},{31.95,68.46},{35.76,69.07},{37.96,69.98},{38.2,72.85},{33.54,73.76},{39.54,78.66},{43.87,76.69},{40.76,75.13},{41.86,72.16},{38.79,73.3},{44.59,71.23},},},nil,12,nil,nil,},
@@ -532,13 +537,15 @@ local testTab3 = {
     [74] = {'Kurran Steele',396,396,10,10,0,{[12]={{41.37,65.59},},},nil,12,nil,nil,},
     [78] = {'Janos Hammerknuckle',204,204,5,5,0,{[12]={{47.24,41.9},},},nil,12,nil,nil,},
     [79] = {'Narg the Taskmaster',257,257,10,10,4,{[12]={{40.93,77.5},},},nil,12,nil,nil,},
+    ]]--
+    ["EP1"] = { 0,0,0,0,0,0,{ { {36.5,56.3},{37.5,56.9},{42.7,54.8},{43.9,50.0},{43.0,46.0},{40.3,46.4},{37.1,48.6} } } },
 }
 
 TESTA = {}
 for k, v in pairs(testTab3)do
     for x, y in pairs(v[7]) do
-        local t = MDL_P:New(y)
-        if t then 
+        local t = MDL_P:New(y,false,true)
+        if t then
             t:Draw(WorldMapFrame.ScrollContainer)
             t:DrawBorder()
             t:SetRandomColor()
