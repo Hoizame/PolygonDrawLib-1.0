@@ -129,6 +129,69 @@ local function InitDefaultColor(colorTable, default, r, g, b, a)
 end
 
 -- Some parts here are from the AVR addon
+local function DrawTriangleOld(parent,tri,x1,y1,x2,y2,x3,y3)
+    local frameWidth = parent:GetWidth()
+    local frameHeight = parent:GetHeight()
+
+    -- format the positions
+    local calcX, calcY = frameWidth / 100, frameHeight / 100
+    x1, y1 = x1*calcX, y1*calcY
+    x2, y2 = x2*calcX, y2*calcY
+    x3, y3 = x3*calcX, y3*calcY
+
+    local minx=min(x1,x2,x3)
+    local miny=min(y1,y2,y3)
+    local maxx=max(x1,x2,x3)
+    local maxy=max(y1,y2,y3)
+
+    if maxx<-frameWidth then return
+    elseif minx>frameWidth then return
+    elseif maxy<-frameHeight then return
+    elseif miny>frameHeight then return
+    end
+
+    local dx=maxx-minx
+    local dy=maxy-miny
+    if dx==0 or dy==0 then return end
+
+    local tx3,ty1,ty2,ty3
+    if x1==minx then
+        if x2==maxx then
+            tx3,ty1,ty2,ty3=(x3-minx)/dx,(maxy-y1),(maxy-y2),(maxy-y3)
+        else
+            tx3,ty1,ty2,ty3=(x2-minx)/dx,(maxy-y1),(maxy-y3),(maxy-y2)
+        end
+    elseif x2==minx then
+        if x1==maxx then
+            tx3,ty1,ty2,ty3=(x3-minx)/dx,(maxy-y2),(maxy-y1),(maxy-y3)
+        else
+            tx3,ty1,ty2,ty3=(x1-minx)/dx,(maxy-y2),(maxy-y3),(maxy-y1)
+        end
+    else -- x3==minx
+        if x2==maxx then
+            tx3,ty1,ty2,ty3=(x1-minx)/dx,(maxy-y3),(maxy-y2),(maxy-y1)
+        else
+            tx3,ty1,ty2,ty3=(x2-minx)/dx,(maxy-y3),(maxy-y1),(maxy-y2)
+        end
+    end
+
+    local t1=-CALC_A/(ty3-tx3*ty2+(tx3-1)*ty1)
+    local t2=dy*t1
+    x1=CALC_B-t1*tx3*ty1
+    x2=CALC_B+t1*ty1
+    x3=t2*tx3+x1
+    y1=t1*(ty2-ty1)
+    y2=t1*(ty1-ty3)
+    y3=-t2+x2
+
+    tri:Show()
+    tri:SetTexCoord(x1,x2,x3,y3,x1+y2,x2+y1,y2+x3,y1+y3)
+    tri:SetPoint("BOTTOMLEFT",parent,"BOTTOMLEFT",minx,miny)
+    tri:SetPoint("TOPRIGHT",parent,"BOTTOMLEFT",maxx,maxy)
+end
+
+-- https://ncase.me/matrix/
+-- https://wow.gamepedia.com/Applying_affine_transformations_using_SetTexCoord
 local function DrawTriangle(parent,tri,x1,y1,x2,y2,x3,y3)
     local frameWidth = parent:GetWidth()
     local frameHeight = parent:GetHeight()
@@ -208,12 +271,38 @@ local function CreateMainFrame(self, parent, freeFrames)
 
     local startPointX, startPointY = self.centroidAbsolute[x], self.centroidAbsolute[y]
 	local frame = Frame_GetFrame("main", parent)
-	frame:SetPoint("CENTER", parent, "TOPLEFT", startPointX*(parent:GetWidth()/100), -(startPointY*(parent:GetHeight()/100)))
+	frame:SetPoint("CENTER", parent, "BOTTOMLEFT", startPointX*(parent:GetWidth()/100), (startPointY*(parent:GetHeight()/100)))
     frame:SetSize(self.boxSize[1]*(parent:GetWidth()/100), self.boxSize[2]*(parent:GetHeight()/100))
     frame:Show()
 
     self.frame = frame
     return frame
+end
+
+
+local function SetToBottomLeft(tab, point, x, y)
+    local new = {}
+    for i = 1, #tab do
+        if not point or point == "TOPLEFT" then
+            new[i] = {
+                [x] = tab[i][x],
+                [y] = 100 - tab[i][y]
+            }
+        elseif point == "TOPRIGHT" then
+            new[i] = {
+                [x] = 100 - (-(tab[i][x])),
+                [y] = 100 - tab[i][y]
+            }
+        elseif point == "BOTTOMRIGHT" then
+            new[i] = {
+                [x] = 100 - (-(tab[i][x])),
+                [y] = tab[i][y]
+            }
+        else
+            error("No valid point found.")
+        end
+    end
+    return new
 end
 
 -- ########################
@@ -223,9 +312,10 @@ end
 --- Create a new polygon out of a table with coordinates
 -- at least 3 points are needed
 -- @param	tab			<table>		format: { [1] = { x, y }, [2] = { x, y }, [2] = { x, y } } or { x=1, y=2 }
+-- @param   point       <string>    "TOPLEFT , "BOTTOMLEFT"     default: "TOPLEFT"
 -- @param	isXYtable	<bool>		true: { x=1, y=2 }		false: { 1, 2 }     default: false
 -- @param   notSilent   <bool>      show error on fail creating a polygon
-function MDL_P:New(tab, isXYtable, notSilent)
+function MDL_P:New(tab, point, isXYtable, notSilent)
     if not tab or type(tab) ~= "table" or #tab < 3 then
         if notSilent then
             assert(tab, "'tab' is nil.")
@@ -239,7 +329,12 @@ function MDL_P:New(tab, isXYtable, notSilent)
 	local x,y = 1,2
 	if isXYtable then
 		x,y = "x","y"
-	end
+    end
+
+    -- format points do "BOTTOMLEFT"
+    if point ~= "BOTTOMLEFT" then
+        tab = SetToBottomLeft(tab, point, x, y)
+    end
 
 	-- Jarvis gift wrapping algorithm
 	-- find the left x point
@@ -359,8 +454,8 @@ function Proto:DrawBorder(thickness, parent)
 		if i > 1 then
             local line = Frame_GetFrame("line", frame)
             line:SetThickness(thickness)
-            line:SetStartPoint("TOPLEFT", frame, lastPoint[x]*calcX, -(lastPoint[y]*calcY))
-            line:SetEndPoint("TOPLEFT", frame, entry[x]*calcX, -(entry[y]*calcY))
+            line:SetStartPoint("BOTTOMLEFT", frame, lastPoint[x]*calcX, (lastPoint[y]*calcY))
+            line:SetEndPoint("BOTTOMLEFT", frame, entry[x]*calcX, (entry[y]*calcY))
             line:Show()
 		end
 		lastPoint = entry
@@ -518,7 +613,6 @@ end
 
 if not IS_TEST then return end
 local testTab3 = {
-    --[[
     [3] = {'Flesh Eater',664,713,24,25,0,{[10]={{25.06,38.2},{25.37,36.04},{25.69,34.45},{23.81,39.21},{22.81,39.09},{22.04,32.62},{21.7,38.3},{22.2,36.96},{25.37,39.03},},},nil,10,nil,nil,},
     [6] = {'Kobold Vermin',42,55,1,2,0,{[12]={{48.89,36.44},{49.55,36.06},{49.15,36.93},{48.1,36.96},{48.37,36.74},{49.32,35.81},{48.87,35.14},{49.87,36.3},{48.52,36.13},{49.17,36.55},{46.93,35.67},{47.58,35.94},{47.65,36.91},{47.86,36.26},{47.57,36.37},{47.62,35.75},{47.91,35.49},{47.36,36.31},{47.22,36.0},{47.55,34.98},{49.79,35.17},{49.44,35.34},{49.73,35.8},{50.04,35.46},{51.3,36.5},{51.23,36.02},{51.61,35.68},{50.49,37.61},{50.98,37.58},{51.29,37.43},{50.76,37.47},{51.36,37.02},{51.68,37.01},},},nil,12,nil,nil,},
     [30] = {'Forest Spider',102,120,5,6,0,{[12]={{36.43,55.89},{31.43,57.03},{35.98,62.7},{38.47,62.4},{28.46,66.71},{31.95,68.46},{35.76,69.07},{37.96,69.98},{38.2,72.85},{33.54,73.76},{39.54,78.66},{43.87,76.69},{40.76,75.13},{41.86,72.16},{38.79,73.3},{44.59,71.23},},},nil,12,nil,nil,},
@@ -528,8 +622,8 @@ local testTab3 = {
     [43] = {'Mine Spider',156,176,8,9,0,{[12]={{62.01,47.92},{60.03,48.68},{61.11,47.28},{61.75,47.45},{60.2,47.56},{61.91,47.12},{61.6,46.9},{60.53,46.9},},},nil,12,nil,nil,},
     [46] = {'Murloc Forager',176,198,9,10,0,{[12]={{68.64,85.46},{68.62,85.39},{65.78,84.42},{64.73,83.0},{61.87,80.56},{56.36,85.21},{52.34,86.73},{57.0,84.24},{59.3,82.43},{61.17,82.38},{63.36,82.8},{67.93,83.69},{69.98,84.08},{76.72,82.77},{76.79,85.94},{76.6,85.57},{77.25,85.18},{77.56,85.95},{76.16,84.87},{77.78,86.13},{79.34,57.2},{79.26,56.87},{79.65,55.22},{79.43,56.36},{78.8,55.73},{78.44,56.65},{78.45,56.16},{78.93,55.01},{79.34,54.08},{79.24,54.22},{79.46,50.74},{79.42,47.96},{79.46,48.2},{79.16,47.39},{79.36,47.7},{80.31,45.24},{79.19,45.21},{79.12,45.99},{79.48,45.36},{79.34,45.25},{79.54,47.18},{79.51,46.31},{79.96,46.28},{78.83,44.53},{77.95,45.11},{78.6,44.91},{78.23,44.87},{79.47,43.52},{78.57,43.17},{77.9,44.36},{77.74,44.28},{77.31,44.1},{78.56,42.09},{79.39,58.05},{75.56,86.58},{76.27,86.46},{75.86,85.94},{74.74,85.27},},},nil,12,nil,nil,},
     [48] = {'Skeletal Warrior',531,573,21,22,0,{[10]={{77.41,73.76},{76.91,72.2},{78.96,69.68},{80.34,72.03},{77.68,71.76},{76.88,70.25},{78.63,70.85},{80.57,70.2},{79.78,68.75},{82.14,68.7},{80.84,73.82},{79.75,73.0},{80.61,66.66},{81.03,69.32},{78.03,67.01},},},nil,10,nil,nil,},
-    [54] = {'Corina Steele',396,396,10,10,0,{[12]={{41.53,65.9},},},nil,12,nil,nil,},
-    [60] = {'Ruklar the Trapper',148,148,8,8,0,{[12]={{64.64,56.65},},},nil,12,nil,nil,},
+    --[54] = {'Corina Steele',396,396,10,10,0,{[12]={{41.53,65.9},},},nil,12,nil,nil,},
+    --[60] = {'Ruklar the Trapper',148,148,8,8,0,{[12]={{64.64,56.65},},},nil,12,nil,nil,},
     [61] = {'Thuros Lightfingers',222,222,11,11,4,{[12]={{52.66,58.91},{28.58,59.92},{29.23,58.0},{30.81,57.12},{50.51,82.93},{50.94,83.1},{89.94,79.45},{89.3,79.28},},},{[12]={{52.66,58.91},{52.67,58.99},{52.68,59.35},{52.73,59.83},{52.67,58.99},{52.66,58.91},{52.58,58.84},},},12,nil,nil,},
     [66] = {'Tharynn Bouden',396,396,10,10,0,{[12]={{41.82,67.16},},},nil,12,nil,nil,},
     [68] = {'Stormwind City Guard',3921,3921,55,55,0,{[12]={{32.08,49.95},{32.47,49.51},},[1519]={{51.47,27.87},{42.55,40.68},{32.96,64.5},{42.45,60.04},{38.6,58.48},{38.37,58.03},{62.46,64.18},{62.4,61.82},{60.61,67.98},{64.18,73.56},{59.93,68.81},{62.76,74.91},{55.43,67.88},{57.06,60.93},{55.1,68.14},{55.22,44.3},{59.93,45.25},{55.42,44.69},{59.69,45.56},{42.96,59.66},{48.95,62.23},{64.22,77.08},{67.82,81.39},{69.96,89.21},{71.48,87.39},},},{[12]={{28.64,38.56},{28.02,37.87},{27.31,37.1},{28.1,37.93},{28.59,38.58},{26.54,38.27},{26.99,37.53},{27.56,38.17},{26.96,37.53},{26.56,38.27},{29.09,44.33},{29.4,44.58},{29.86,45.48},{29.93,45.61},{30.9,47.48},{31.08,48.29},{31.5,49.15},{31.08,48.29},{30.9,47.48},{29.93,45.61},{29.86,45.48},{29.4,44.58},{29.58,43.66},{29.63,44.17},{30.21,45.23},{31.23,47.14},{32.34,46.09},{31.52,47.37},{32.07,48.38},{31.52,47.37},{32.34,46.09},{31.23,47.14},{30.21,45.23},{29.63,44.17},},[1519]={{62.47,61.72},{60.85,59.93},{59.01,57.95},{61.06,60.09},{62.34,61.78},{57.04,60.98},{58.19,59.05},{59.67,60.7},{58.12,59.07},{57.09,60.98},{63.61,76.62},{64.42,77.27},{65.62,79.58},{65.79,79.93},{68.28,84.75},{68.76,86.85},{69.84,89.08},{68.76,86.85},{68.28,84.75},{65.79,79.93},{65.62,79.58},{64.42,77.27},{64.89,74.89},{65.02,76.21},{66.52,78.95},{69.13,83.87},{72.0,81.18},{69.9,84.46},{71.32,87.07},{69.9,84.46},{72.0,81.18},{69.13,83.87},{66.52,78.95},{65.02,76.21},},},1519,nil,nil,},
@@ -537,14 +631,14 @@ local testTab3 = {
     [74] = {'Kurran Steele',396,396,10,10,0,{[12]={{41.37,65.59},},},nil,12,nil,nil,},
     [78] = {'Janos Hammerknuckle',204,204,5,5,0,{[12]={{47.24,41.9},},},nil,12,nil,nil,},
     [79] = {'Narg the Taskmaster',257,257,10,10,4,{[12]={{40.93,77.5},},},nil,12,nil,nil,},
-    ]]--
+
     ["EP1"] = { 0,0,0,0,0,0,{ { {36.5,56.3},{37.5,56.9},{42.7,54.8},{43.9,50.0},{43.0,46.0},{40.3,46.4},{37.1,48.6} } } },
 }
 
 TESTA = {}
 for k, v in pairs(testTab3)do
     for x, y in pairs(v[7]) do
-        local t = MDL_P:New(y,false,true)
+        local t = MDL_P:New(y,"TOPLEFT",false,false)
         if t then
             t:Draw(WorldMapFrame.ScrollContainer)
             t:DrawBorder()
