@@ -5,5 +5,10 @@ assert(LibPath, "X-MapDrawLib-Path for \"MapDrawLib\" not found! ".." Set ## X-M
 local MAJOR, MINOR = "MapDrawLib", 1
 assert(LibStub, MAJOR .. " requires LibStub")
 
+local MDL_P = LibStub:GetLibrary("MapDrawLib-Polygon", false)
+if not MDL_P then return end
+
 local MDL, oldversion = LibStub:NewLibrary(MAJOR, MINOR)
 if not MDL then return end
+
+

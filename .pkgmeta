@@ -1,1 +1,6 @@
 package-as: MapDrawLib
+
+enable-nolib-creation: no
+
+ignore:
+    - Utils/raw
