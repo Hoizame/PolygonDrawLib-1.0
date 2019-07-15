@@ -1,0 +1,6 @@
+package-as: PolygonDrawLib-1.0
+
+enable-nolib-creation: no
+
+ignore:
+    - Utils/rawgit info

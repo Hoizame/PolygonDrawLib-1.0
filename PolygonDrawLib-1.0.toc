@@ -1,0 +1,10 @@
+## Interface: 11302
+## Title: Lib: PolygonDrawLib-1.0
+## Notes: PolygonDrawLib-1.0
+## Author: Lag
+## Version: 1.0.0
+## X-PolygonDrawLib-Path: Interface/AddOns/PolygonDrawLib-1.0
+
+LibStub\LibStub.lua
+
+PolygonDrawLib-1.0.xml
