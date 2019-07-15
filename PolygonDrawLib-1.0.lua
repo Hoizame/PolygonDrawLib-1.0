@@ -312,7 +312,7 @@ end
 -- @param	tab			<table>		format: { [1] = { x, y }, [2] = { x, y }, [2] = { x, y } } or { x=1, y=2 }
 -- @param   point       <string>    "TOPLEFT , "BOTTOMLEFT"     default: "TOPLEFT"
 -- @param	isXYtable	<bool>		true: { x=1, y=2 }		false: { 1, 2 }     default: false
--- @param   notSilent   <bool>      show error on fail creating a polygon
+-- @param   notSilent   <bool>      show error on fail creating a polygon   default: false
 function MDL_P:New(tab, point, isXYtable, notSilent)
     if not tab or type(tab) ~= "table" or #tab < 3 then
         if notSilent then

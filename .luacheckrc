@@ -6,7 +6,8 @@ exclude_files = {
 	"WeakAuras_Options.lua",
 	"WeakAuras_Templates.lua",
 	"WeakAuras/Libs/",
-	".luacheckrc"
+	".luacheckrc",
+	"README.md"
 }
 ignore = {
 	"11./SLASH_.*", -- Setting an undefined (Slash handler) global variable
