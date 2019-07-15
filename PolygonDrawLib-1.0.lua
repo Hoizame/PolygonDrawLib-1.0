@@ -1,8 +1,8 @@
 local AddonName = ...
-local LibPath = GetAddOnMetadata(AddonName, "X-MapDrawLib-Path")
-assert(LibPath, "X-MapDrawLib-Path for \"MapDrawLib\" not found! ".." Set ## X-MapDrawLib-Path: in the "..AddonName..".toc")
+local LibPath = GetAddOnMetadata(AddonName, "X-PolygonDrawLib-Path")
+assert(LibPath, "X-PolygonDrawLib-Path for \"PolygonDrawLib\" not found! ".." Set ## X-PolygonDrawLib-Path: in the "..AddonName..".toc")
 
-local MAJOR, MINOR = "MapDrawLib-Polygon", 1
+local MAJOR, MINOR = "PolygonDrawLib-1.0", 1
 assert(LibStub, MAJOR .. " requires LibStub")
 
 local MDL_P, oldversion = LibStub:NewLibrary(MAJOR, MINOR)
