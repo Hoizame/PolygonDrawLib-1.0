@@ -20,7 +20,7 @@ local CreateFrame = CreateFrame
 local print = print
 
 -- locales
-local IS_TEST = true
+local IS_TEST = false
 local TRIANGLE_PATH = LibPath.."/Utils/triangle.tga"
 local LINE_PATH = LibPath.."/Utils/line.blp"
 local DEFAULT_COLORS = {
@@ -126,68 +126,6 @@ local function InitDefaultColor(colorTable, default, r, g, b, a)
     colorTable[2] = g or colorTable[2] or default[2]
     colorTable[3] = b or colorTable[3] or default[3]
     colorTable[4] = a or colorTable[4] or default[4]
-end
-
--- Some parts here are from the AVR addon
-local function DrawTriangleOld(parent,tri,x1,y1,x2,y2,x3,y3)
-    local frameWidth = parent:GetWidth()
-    local frameHeight = parent:GetHeight()
-
-    -- format the positions
-    local calcX, calcY = frameWidth / 100, frameHeight / 100
-    x1, y1 = x1*calcX, y1*calcY
-    x2, y2 = x2*calcX, y2*calcY
-    x3, y3 = x3*calcX, y3*calcY
-
-    local minx=min(x1,x2,x3)
-    local miny=min(y1,y2,y3)
-    local maxx=max(x1,x2,x3)
-    local maxy=max(y1,y2,y3)
-
-    if maxx<-frameWidth then return
-    elseif minx>frameWidth then return
-    elseif maxy<-frameHeight then return
-    elseif miny>frameHeight then return
-    end
-
-    local dx=maxx-minx
-    local dy=maxy-miny
-    if dx==0 or dy==0 then return end
-
-    local tx3,ty1,ty2,ty3
-    if x1==minx then
-        if x2==maxx then
-            tx3,ty1,ty2,ty3=(x3-minx)/dx,(maxy-y1),(maxy-y2),(maxy-y3)
-        else
-            tx3,ty1,ty2,ty3=(x2-minx)/dx,(maxy-y1),(maxy-y3),(maxy-y2)
-        end
-    elseif x2==minx then
-        if x1==maxx then
-            tx3,ty1,ty2,ty3=(x3-minx)/dx,(maxy-y2),(maxy-y1),(maxy-y3)
-        else
-            tx3,ty1,ty2,ty3=(x1-minx)/dx,(maxy-y2),(maxy-y3),(maxy-y1)
-        end
-    else -- x3==minx
-        if x2==maxx then
-            tx3,ty1,ty2,ty3=(x1-minx)/dx,(maxy-y3),(maxy-y2),(maxy-y1)
-        else
-            tx3,ty1,ty2,ty3=(x2-minx)/dx,(maxy-y3),(maxy-y1),(maxy-y2)
-        end
-    end
-
-    local t1=-CALC_A/(ty3-tx3*ty2+(tx3-1)*ty1)
-    local t2=dy*t1
-    x1=CALC_B-t1*tx3*ty1
-    x2=CALC_B+t1*ty1
-    x3=t2*tx3+x1
-    y1=t1*(ty2-ty1)
-    y2=t1*(ty1-ty3)
-    y3=-t2+x2
-
-    tri:Show()
-    tri:SetTexCoord(x1,x2,x3,y3,x1+y2,x2+y1,y2+x3,y1+y3)
-    tri:SetPoint("BOTTOMLEFT",parent,"BOTTOMLEFT",minx,miny)
-    tri:SetPoint("TOPRIGHT",parent,"BOTTOMLEFT",maxx,maxy)
 end
 
 -- https://ncase.me/matrix/
@@ -414,7 +352,7 @@ function MDL_P:New(tab, point, isXYtable, notSilent)
 end
 
 -- ########################
--- API / return of :New
+-- API object / return of :New
 -- ########################
 
 --- Adds a border around the polygon
