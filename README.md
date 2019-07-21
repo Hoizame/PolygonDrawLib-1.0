@@ -2,6 +2,8 @@
 
 A library for WoW-Classic to draw polygons out of a table with x, y coordinates.
 
+![image](https://drive.google.com/uc?export=view&id=1tIgynS03jyVvmQhXhmSPNHJ_-h-jXC11)
+
 ## Requirements
 
 Set the path of the libary within the .toc file of your addon.
